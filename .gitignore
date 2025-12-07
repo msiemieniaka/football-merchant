@@ -3,6 +3,7 @@
 #
 # Binaries for programs and plugins
 __pycache__/
+.vscode
 *.env
 *.exe
 *.exe~
