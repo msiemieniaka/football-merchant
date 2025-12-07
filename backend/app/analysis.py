@@ -1,121 +1,134 @@
-# backend/app/analysis.py
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, desc
 from . import models
 
-def get_recent_form(db: Session, team_id: int, limit: int = 5):
-    """
-    Calculates the form of a team based on the last 'limit' finished matches.
-    Returns a score (3 pts for win, 1 for draw) and a text summary.
-    """
-    # Fetch last 5 finished matches for this team (home or away)
+def get_team_form(db: Session, team_id: int, limit: int = 5):
+    """Analyzes form based on the last 5 matches."""
     matches = db.query(models.Match).filter(
         or_(models.Match.home_team_id == team_id, models.Match.away_team_id == team_id),
         models.Match.status == 'FINISHED'
     ).order_by(desc(models.Match.date)).limit(limit).all()
 
-    points = 0
-    summary = []
-
-    for m in matches:
-        # Determine if the team was Home or Away
-        is_home = m.home_team_id == team_id
-        
-        # Determine result
-        if m.home_score is None or m.away_score is None:
-            continue # Skip if data is incomplete
-
-        if m.home_score == m.away_score:
-            points += 1
-            result = "D" # Draw
-        elif is_home and m.home_score > m.away_score:
-            points += 3
-            result = "W" # Win
-        elif not is_home and m.away_score > m.home_score:
-            points += 3
-            result = "W"
-        else:
-            points += 0
-            result = "L" # Loss
-        
-        opponent = m.away_team.name if is_home else m.home_team.name
-        summary.append(f"{result} vs {opponent} ({m.home_score}-{m.away_score})")
-
-    return {
-        "points": points,
-        "form_str": ", ".join(summary),
-        "matches_played": len(matches)
+    stats = {
+        "matches": 0, "points": 0,
+        "goals_scored": 0, "goals_conceded": 0,
+        "xg_created": 0.0, "xg_conceded": 0.0,
+        "results": []
     }
 
+    if not matches: return stats
+
+    for m in matches:
+        is_home = m.home_team_id == team_id
+        
+        gf = m.home_score if is_home else m.away_score
+        ga = m.away_score if is_home else m.home_score
+        
+        xg_f = 0.0; xg_a = 0.0
+        if m.stats:
+            xg_f = m.stats.home_xg if is_home else m.stats.away_xg or 0.0
+            xg_a = m.stats.away_xg if is_home else m.stats.home_xg or 0.0
+
+        if gf > ga:
+            stats["points"] += 3; stats["results"].append("W")
+        elif gf == ga:
+            stats["points"] += 1; stats["results"].append("D")
+        else:
+            stats["results"].append("L")
+            
+        stats["matches"] += 1
+        stats["goals_scored"] += gf; stats["goals_conceded"] += ga
+        stats["xg_created"] += xg_f; stats["xg_conceded"] += xg_a
+
+    return stats
+
+def get_top_players_string(db: Session, team_id: int):
+    """NEW: Gets the top 4 players of a team (by goals and xG).
+    Used to feed Ollama with real names."""
+    players = db.query(models.Player).filter(models.Player.team_id == team_id).all()
+    
+    if not players:
+        return "No player data available."
+
+    # Sort players: First by Goals, then by xG. Take the top 4.
+    top_players = sorted(players, key=lambda p: (p.goals, p.xg), reverse=True)[:4]
+    
+    # Create a string e.g.: "Salah (10G, 5.2xG), Nunez (5G)"
+    names_list = []
+    for p in top_players:
+        stats_part = f"{p.goals} Goals"
+        if p.assists > 0: stats_part += f", {p.assists} Assists"
+        if p.xg > 0: stats_part += f", {p.xg:.2f} xG"
+        names_list.append(f"{p.name} ({stats_part})")
+        
+    return "; ".join(names_list)
+
 def generate_predictions(db: Session):
-    """
-    Finds upcoming matches and generates predictions based on recent form.
-    Saves the result to the 'Predictions' table.
-    """
-    # 1. Get all upcoming matches (Scheduled)
-    upcoming_matches = db.query(models.Match).filter(
-        models.Match.status == 'TIMED'
+    upcoming = db.query(models.Match).filter(
+        or_(models.Match.status == 'SCHEDULED', models.Match.status == 'TIMED')
     ).all()
 
-    print(f">>> Found {len(upcoming_matches)} upcoming matches to analyze.")
-    
-    predictions_made = 0
+    print(f">>> [ALGO] Generating predictions for {len(upcoming)} matches...")
+    count = 0
 
-    for match in upcoming_matches:
-        # Check if prediction already exists
-        existing_pred = db.query(models.Prediction).filter(models.Prediction.match_id == match.id).first()
-        if existing_pred:
-            continue
+    for match in upcoming:
+        # Delete old prediction to update player data
+        db.query(models.Prediction).filter(models.Prediction.match_id == match.id).delete()
+        
+        home_stats = get_team_form(db, match.home_team_id)
+        away_stats = get_team_form(db, match.away_team_id)
+        
+        if home_stats["matches"] == 0 or away_stats["matches"] == 0: continue
 
-        # 2. Analyze Home Team Form
-        home_stats = get_recent_form(db, match.home_team_id)
-        # 3. Analyze Away Team Form
-        away_stats = get_recent_form(db, match.away_team_id)
+        h_attack = (home_stats["goals_scored"] + home_stats["xg_created"]) / home_stats["matches"]
+        a_attack = (away_stats["goals_scored"] + away_stats["xg_created"]) / away_stats["matches"]
+        h_defense = (home_stats["goals_conceded"] + home_stats["xg_conceded"]) / home_stats["matches"]
+        a_defense = (away_stats["goals_conceded"] + away_stats["xg_conceded"]) / away_stats["matches"]
 
-        # 4. Simple Algorithm Logic
-        # Calculate win probability based on form points difference
-        total_points = home_stats['points'] + away_stats['points']
-        if total_points == 0:
-            confidence = 0.5 # No data, pure guess
-            winner_id = None # Draw likely
+        home_score = h_attack - a_defense + 0.25 # Home advantage
+        away_score = a_attack - h_defense
+
+        diff = home_score - away_score
+        winner_id = None; confidence = 0.5; outcome_text = "Draw"
+
+        if diff > 0.35:
+            winner_id = match.home_team_id
+            confidence = 0.5 + min(diff/3, 0.45)
+            outcome_text = f"{match.home_team.name} Win"
+        elif diff < -0.35:
+            winner_id = match.away_team_id
+            confidence = 0.5 + min(abs(diff)/3, 0.45)
+            outcome_text = f"{match.away_team.name} Win"
         else:
-            # Simple heuristic
-            home_strength = home_stats['points']
-            away_strength = away_stats['points']
-            
-            if home_strength > away_strength:
-                winner_id = match.home_team_id
-                confidence = 0.5 + ((home_strength - away_strength) / 30) # Normalize slightly
-            elif away_strength > home_strength:
-                winner_id = match.away_team_id
-                confidence = 0.5 + ((away_strength - home_strength) / 30)
-            else:
-                winner_id = None # Predict Draw
-                confidence = 0.5
+            outcome_text = "Draw"
+            confidence = 0.5 + (0.35 - abs(diff))
 
-        # Cap confidence at 0.95
-        confidence = min(confidence, 0.95)
+        home_squad = get_top_players_string(db, match.home_team_id)
+        away_squad = get_top_players_string(db, match.away_team_id)
 
-        # 5. Prepare Rich Context for Ollama (AI)
-        # This text will be sent to the LLM later
         analysis_text = (
-            f"Match: {match.home_team.name} vs {match.away_team.name}. "
-            f"\n{match.home_team.name} Form (Last 5): {home_stats['points']} pts. Details: {home_stats['form_str']}. "
-            f"\n{match.away_team.name} Form (Last 5): {away_stats['points']} pts. Details: {away_stats['form_str']}. "
-            f"\nAlgorithmic Prediction: {'Draw' if winner_id is None else 'Winner: ' + (match.home_team.name if winner_id == match.home_team_id else match.away_team.name)} "
-            f"with {int(confidence * 100)}% confidence."
+            f"PREMIER LEAGUE MATCH DATA\n"
+            f"Match: {match.home_team.name} vs {match.away_team.name}\n"
+            f"Prediction: {outcome_text} (Confidence: {int(confidence*100)}%)\n\n"
+            f"=== {match.home_team.name} ===\n"
+            f"Recent Form: {', '.join(home_stats['results'])}\n"
+            f"Stats (Last 5): {home_stats['goals_scored']} Goals, {home_stats['xg_created']:.2f} xG\n"
+            f"KEY PLAYERS (AVAILABLE): {home_squad}\n\n"
+            f"=== {match.away_team.name} ===\n"
+            f"Recent Form: {', '.join(away_stats['results'])}\n"
+            f"Stats (Last 5): {away_stats['goals_scored']} Goals, {away_stats['xg_created']:.2f} xG\n"
+            f"KEY PLAYERS (AVAILABLE): {away_squad}\n"
         )
 
-        # 6. Save to DB
-        new_pred = models.Prediction(
+        pred = models.Prediction(
             match_id=match.id,
             predicted_winner_id=winner_id,
             is_draw_prediction=(winner_id is None),
             confidence_score=confidence,
             analysis_content=analysis_text
         )
-        db.add(new_pred)
-        predictions_made += 1
+        db.add(pred)
+        count += 1
 
     db.commit()
-    return {"status": "success", "predictions_generated": predictions_made}
+    return {"status": "success", "predictions": count}

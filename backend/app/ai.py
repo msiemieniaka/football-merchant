@@ -2,21 +2,24 @@ import requests
 import json
 
 OLLAMA_URL = "http://ollama:11434/api/generate"
-MODEL_NAME = "llama3"
+MODEL_NAME = "llama3" 
 
 def generate_match_commentary(context_text: str):
-    """
-    Sends match stats to Ollama and gets a professional analysis.
-    """
     prompt = f"""
-    You are a professional Premier League football analyst. 
-    Analyze the following match data and prediction:
-    
+    You are a professional football analyst covering the Premier League.
+    Write a match preview based STRICTLY on the provided data.
+    Predict the exact score of the match.
+    Predict which team will score first and how many cards will be given, and to whom.
+
+    DATA:
     {context_text}
+
+    RULES:
+    1. **ONLY mention players listed in the "KEY PLAYERS" section.** Do NOT invent players or mention old players not listed here.
+    2. Mention xG (Expected Goals) to justify the form.
+    3. Explain why the predicted outcome is likely.
     
-    Write match preview that will contain exact score of the match, who will score first and who will get more cards. 
-    Explain why the predicted winner is favored based on the form.
-    Do not mention 'algorithm' or 'confidence score' explicitly.
+    Output purely the commentary text.
     """
 
     payload = {
@@ -28,7 +31,7 @@ def generate_match_commentary(context_text: str):
     try:
         response = requests.post(OLLAMA_URL, json=payload)
         response.raise_for_status()
-        return response.json().get("response", "Error generation analysis.")
+        return response.json().get("response", "Error generating analysis.")
     except Exception as e:
         print(f"Ollama Error: {e}")
         return None
