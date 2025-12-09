@@ -1,6 +1,6 @@
 # Football Merchant
 
-![Architecture Diagram](diagram-football-merchant.png)
+![Architecture Diagram](diagram-football-merchant-1.png)
 
 A brief one or two-paragraph description of what your project does, who it's for, and the problem it solves. Based on the name "Football Merchant", this could be an e-commerce platform for football-related merchandise or a data-driven application for football statistics and trading.
 
