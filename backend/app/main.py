@@ -16,10 +16,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def read_root():
+    return {"message": "Football AI Backend is running"}
+
 
 @app.get("/table")
 def get_league_table(db: Session = Depends(database.get_db)):
-    """Zwraca tabelę ligową posortowaną wg punktów"""
+    """Returns the league table sorted by points"""
     teams = db.query(models.Team).order_by(
         desc(models.Team.points), 
         desc(models.Team.goals_scored - models.Team.goals_conceded)
@@ -31,7 +35,7 @@ def get_matches(db: Session = Depends(database.get_db)):
     """Returns upcoming matches with predictions"""
     matches = db.query(models.Match).filter(
         models.Match.status != "FINISHED"
-    ).order_by(models.Match.date).all()
+    ).order_by(models.Match.date).limit(10).all()
     
     # Format data nicely for React
     result = []
@@ -42,14 +46,15 @@ def get_matches(db: Session = Depends(database.get_db)):
             "date": m.date,
             "home_team": m.home_team.name,
             "away_team": m.away_team.name,
-            "logo_home": m.home_team.logo_url, # (If available)
+            "logo_home": m.home_team.logo_url,
             "logo_away": m.away_team.logo_url,
             "prediction": {
                 "winner": "Draw" if pred and pred.is_draw_prediction else (
                     m.home_team.name if pred and pred.predicted_winner_id == m.home_team_id else m.away_team.name
                 ),
                 "confidence": int(pred.confidence_score * 100) if pred else 0,
-                "ai_text": pred.ai_generated_commentary if pred else None
+                "ai_text": pred.ai_generated_commentary if pred else None,
+                "analysis_content": pred.analysis_content if pred else None
             } if pred else None
         })
     return result
@@ -84,3 +89,7 @@ def sync_data(db: Session = Depends(database.get_db)):
 @app.post("/run-algo")
 def run_algo(db: Session = Depends(database.get_db)):
     return analysis.generate_predictions(db)
+
+@app.post("/update-logos")
+def update_logos_endpoint(db: Session = Depends(database.get_db)):
+    return services.update_team_logos(db)
