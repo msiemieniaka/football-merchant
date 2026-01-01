@@ -59,6 +59,32 @@ def get_matches(db: Session = Depends(database.get_db)):
         })
     return result
 
+@app.get("/matches/{match_id}")
+def get_match(match_id: int, db: Session = Depends(database.get_db)):
+    """Returns detailed data for a single match"""
+    m = db.query(models.Match).filter(models.Match.id == match_id).first()
+    
+    if not m:
+        raise HTTPException(404, "Match not found")
+    
+    pred = m.prediction
+    return {
+        "id": m.id,
+        "date": m.date,
+        "home_team": m.home_team.name,
+        "away_team": m.away_team.name,
+        "logo_home": m.home_team.logo_url,
+        "logo_away": m.away_team.logo_url,
+        "prediction": {
+            "winner": "Draw" if pred and pred.is_draw_prediction else (
+                m.home_team.name if pred and pred.predicted_winner_id == m.home_team_id else m.away_team.name
+            ),
+            "confidence": int(pred.confidence_score * 100) if pred else 0,
+            "ai_text": pred.ai_generated_commentary if pred else None,
+            "analysis_content": pred.analysis_content if pred else None
+        } if pred else None
+    }
+
 @app.post("/analyze/{match_id}")
 def analyze_match(match_id: int, db: Session = Depends(database.get_db)):
     """Forces AI analysis for a specific match"""
