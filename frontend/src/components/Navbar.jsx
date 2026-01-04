@@ -2,17 +2,16 @@ import { Link, useLocation } from 'react-router-dom'
 
 function Navbar() {
   const location = useLocation()
-  
+
   const NavLink = ({ to, label, icon }) => {
     const active = location.pathname === to
     return (
-      <Link 
-        to={to} 
-        className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-          active 
-            ? 'bg-emerald-500/10 text-emerald-400' 
+      <Link
+        to={to}
+        className={`flex items-center px-4 py-2 rounded-lg transition-colors ${active
+            ? 'bg-emerald-500/10 text-emerald-400'
             : 'text-gray-400 hover:text-white hover:bg-slate-800'
-        }`}
+          }`}
       >
         <span className="mr-2">{icon}</span> {label}
       </Link>
@@ -25,10 +24,7 @@ function Navbar() {
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center">
             <Link to="/" className="flex items-center mr-8">
-              <span className="text-2xl mr-2">⚽</span>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                Football AI
-              </h1>
+              <img src="/logo.png" alt="Football AI" className="h-10 w-auto" />
             </Link>
             <div className="flex space-x-2">
               <NavLink to="/" label="Home" icon="🏠" />
