@@ -19,7 +19,12 @@ def generate_match_commentary(context_text: str):
     2. Mention xG (Expected Goals) to justify the form.
     3. Explain why the predicted outcome is likely.
     
-    Output purely the commentary text.
+    OUTPUT FORMAT:
+    You MUST start your response with these two lines (replace Team A with the actual team name you predict to win, and X-Y with home team score - away team score):
+    Predicted Winner: Team A
+    Predicted Score: X - Y
+    
+    Then provide the full match preview and analysis.
     """
 
     payload = {
