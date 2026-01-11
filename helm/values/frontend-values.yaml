@@ -66,4 +66,4 @@ frontend:
 
   vpa:
     enabled: false
-    updateMode: "Auto"
+    updateMode: "InPlaceOrRecreate"

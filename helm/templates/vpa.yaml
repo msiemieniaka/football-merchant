@@ -18,7 +18,7 @@ spec:
     kind: Deployment
     name: {{ .Values.frontend.name | default "frontend" }}
   updatePolicy:
-    updateMode: {{ .Values.frontend.vpa.updateMode | default "Auto" }}
+    updateMode: {{ .Values.frontend.vpa.updateMode | default "Recreate" }}
   resourcePolicy:
     containerPolicies:
       - containerName: {{ .Values.frontend.name | default "frontend" }}
@@ -26,8 +26,8 @@ spec:
           cpu: "50m"
           memory: "64Mi"
         maxAllowed:
-          cpu: "500m"
-          memory: "512Mi"
+          cpu: "1000m"
+          memory: "1Gi"
 ---
 {{- end }}
 
@@ -47,13 +47,13 @@ spec:
     kind: Deployment
     name: {{ .Values.backend.name | default "backend" }}
   updatePolicy:
-    updateMode: {{ .Values.backend.vpa.updateMode | default "Auto" }}
+    updateMode: {{ .Values.backend.vpa.updateMode | default "Recreate" }}
   resourcePolicy:
     containerPolicies:
       - containerName: {{ .Values.backend.name | default "backend" }}
         minAllowed:
-          cpu: "100m"
-          memory: "128Mi"
+          cpu: "50m"
+          memory: "64Mi"
         maxAllowed:
           cpu: "1000m"
           memory: "1Gi"

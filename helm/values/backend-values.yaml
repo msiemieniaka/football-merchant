@@ -56,7 +56,7 @@ backend:
 
   # Autoscaling - nested under backend
   hpa:
-    enabled: true
+    enabled: false
     minReplicas: 1
     maxReplicas: 12
     targetCPUUtilizationPercentage: 70
@@ -80,5 +80,5 @@ backend:
         selectPolicy: Max
 
   vpa:
-    enabled: false
-    updateMode: "Auto"
+    enabled: true
+    updateMode: "InPlaceOrRecreate"
