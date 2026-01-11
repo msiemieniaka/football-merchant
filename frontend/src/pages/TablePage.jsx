@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 
+const API_BASE = '/api'
+
 function TablePage() {
     const [teams, setTeams] = useState([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        axios.get('http://localhost:8000/table')
+        axios.get(`${API_BASE}/table`)
             .then(res => {
                 setTeams(res.data)
                 setLoading(false)

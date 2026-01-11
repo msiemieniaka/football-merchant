@@ -1,0 +1,84 @@
+# Backend Configuration
+backend:
+  enabled: true
+  name: backend
+  replicas: 1
+
+  image:
+    repository: ciulik/football-merchant-ai-backend
+    tag: "1.4" # New version with Redis caching support
+    pullPolicy: Always
+
+  port: 8000
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  env:
+    # Connect through PgBouncer instead of directly to PostgreSQL
+    - name: DATABASE_URL
+      value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@pgbouncer:5432/$(POSTGRES_DB)"
+    - name: OLLAMA_URL
+      value: "http://ollama:11434/api/generate"
+    # Redis cache configuration
+    - name: REDIS_URL
+      value: "redis://redis:6379/0"
+    - name: CACHE_TTL
+      value: "300" # 5 minutes in seconds
+    - name: CACHE_ENABLED
+      value: "true"
+
+  envFrom:
+    - secretRef:
+        name: football-ai-secrets
+
+  # Health checks
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+  # Autoscaling - nested under backend
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 70
+    # Scaling behavior policies
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+          - type: Pods
+            value: 4
+            periodSeconds: 15
+        selectPolicy: Max
+
+  vpa:
+    enabled: false
+    updateMode: "Auto"

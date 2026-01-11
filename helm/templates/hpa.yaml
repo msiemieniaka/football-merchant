@@ -1,0 +1,114 @@
+{{/*
+HPA for Frontend and Backend
+*/}}
+
+{{- /* Frontend HPA */ -}}
+{{- if and .Values.frontend .Values.frontend.hpa .Values.frontend.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.frontend.name | default "frontend" }}-hpa
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.frontend.name | default "frontend" }}
+  minReplicas: {{ .Values.frontend.hpa.minReplicas | default 2 }}
+  maxReplicas: {{ .Values.frontend.hpa.maxReplicas | default 10 }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.frontend.hpa.targetCPUUtilizationPercentage | default 70 }}
+  {{- if .Values.frontend.hpa.behavior }}
+  behavior:
+    {{- if .Values.frontend.hpa.behavior.scaleDown }}
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.frontend.hpa.behavior.scaleDown.stabilizationWindowSeconds | default 300 }}
+      policies:
+      {{- range .Values.frontend.hpa.behavior.scaleDown.policies }}
+      - type: {{ .type }}
+        value: {{ .value }}
+        periodSeconds: {{ .periodSeconds }}
+      {{- end }}
+      {{- if .Values.frontend.hpa.behavior.scaleDown.selectPolicy }}
+      selectPolicy: {{ .Values.frontend.hpa.behavior.scaleDown.selectPolicy }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.frontend.hpa.behavior.scaleUp }}
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.frontend.hpa.behavior.scaleUp.stabilizationWindowSeconds | default 0 }}
+      policies:
+      {{- range .Values.frontend.hpa.behavior.scaleUp.policies }}
+      - type: {{ .type }}
+        value: {{ .value }}
+        periodSeconds: {{ .periodSeconds }}
+      {{- end }}
+      {{- if .Values.frontend.hpa.behavior.scaleUp.selectPolicy }}
+      selectPolicy: {{ .Values.frontend.hpa.behavior.scaleUp.selectPolicy }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+---
+{{- end }}
+
+{{- /* Backend HPA */ -}}
+{{- if and .Values.backend .Values.backend.hpa .Values.backend.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.backend.name | default "backend" }}-hpa
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.backend.name | default "backend" }}
+  minReplicas: {{ .Values.backend.hpa.minReplicas | default 2 }}
+  maxReplicas: {{ .Values.backend.hpa.maxReplicas | default 10 }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.backend.hpa.targetCPUUtilizationPercentage | default 70 }}
+  {{- if .Values.backend.hpa.behavior }}
+  behavior:
+    {{- if .Values.backend.hpa.behavior.scaleDown }}
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.backend.hpa.behavior.scaleDown.stabilizationWindowSeconds | default 300 }}
+      policies:
+      {{- range .Values.backend.hpa.behavior.scaleDown.policies }}
+      - type: {{ .type }}
+        value: {{ .value }}
+        periodSeconds: {{ .periodSeconds }}
+      {{- end }}
+      {{- if .Values.backend.hpa.behavior.scaleDown.selectPolicy }}
+      selectPolicy: {{ .Values.backend.hpa.behavior.scaleDown.selectPolicy }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.backend.hpa.behavior.scaleUp }}
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.backend.hpa.behavior.scaleUp.stabilizationWindowSeconds | default 0 }}
+      policies:
+      {{- range .Values.backend.hpa.behavior.scaleUp.policies }}
+      - type: {{ .type }}
+        value: {{ .value }}
+        periodSeconds: {{ .periodSeconds }}
+      {{- end }}
+      {{- if .Values.backend.hpa.behavior.scaleUp.selectPolicy }}
+      selectPolicy: {{ .Values.backend.hpa.behavior.scaleUp.selectPolicy }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

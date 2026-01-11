@@ -8,3 +8,4 @@ pandas
 beautifulsoup4
 lxml
 html5lib
+redis>=5.0.0

@@ -2,13 +2,15 @@ import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 
+const API_BASE = '/api'
+
 function LandingPage() {
     const [stats, setStats] = useState({ matchCount: 0, teamCount: 0 })
 
     useEffect(() => {
         Promise.all([
-            axios.get('http://localhost:8000/matches'),
-            axios.get('http://localhost:8000/table')
+            axios.get(`${API_BASE}/matches`),
+            axios.get(`${API_BASE}/table`)
         ]).then(([matchesRes, tableRes]) => {
             setStats({
                 matchCount: matchesRes.data.length,

@@ -1,0 +1,14 @@
+# Base/Shared Configuration
+namespace: football-ai
+
+# Global settings
+global:
+  imagePullPolicy: IfNotPresent
+
+# Default empty structures - will be populated by component values files
+frontend: {}
+backend: {}
+postgres: {}
+ollama: {}
+pgadmin: {}
+ingress: {}

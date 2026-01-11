@@ -1,0 +1,69 @@
+# Frontend Configuration
+frontend:
+  enabled: true
+  name: frontend
+  replicas: 1
+
+  image:
+    repository: ciulik/football-merchant-ai-frontend
+    tag: "1.4"
+    pullPolicy: Always
+
+  port: 5173
+
+  service:
+    type: NodePort
+    port: 5173
+    nodePort: 30000
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+  env: []
+
+  # Health checks
+  livenessProbe:
+    enabled: true
+    path: /
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    enabled: true
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+  # Autoscaling - nested under frontend
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 70
+    # Scaling behavior policies
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+          - type: Pods
+            value: 4
+            periodSeconds: 15
+        selectPolicy: Max
+
+  vpa:
+    enabled: false
+    updateMode: "Auto"

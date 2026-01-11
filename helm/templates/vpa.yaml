@@ -1,0 +1,60 @@
+{{/*
+VPA for Frontend and Backend
+*/}}
+
+{{- /* Frontend VPA */ -}}
+{{- if and .Values.frontend .Values.frontend.vpa .Values.frontend.vpa.enabled }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ .Values.frontend.name | default "frontend" }}-vpa
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.frontend.name | default "frontend" }}
+  updatePolicy:
+    updateMode: {{ .Values.frontend.vpa.updateMode | default "Auto" }}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: {{ .Values.frontend.name | default "frontend" }}
+        minAllowed:
+          cpu: "50m"
+          memory: "64Mi"
+        maxAllowed:
+          cpu: "500m"
+          memory: "512Mi"
+---
+{{- end }}
+
+{{- /* Backend VPA */ -}}
+{{- if and .Values.backend .Values.backend.vpa .Values.backend.vpa.enabled }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ .Values.backend.name | default "backend" }}-vpa
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.backend.name | default "backend" }}
+  updatePolicy:
+    updateMode: {{ .Values.backend.vpa.updateMode | default "Auto" }}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: {{ .Values.backend.name | default "backend" }}
+        minAllowed:
+          cpu: "100m"
+          memory: "128Mi"
+        maxAllowed:
+          cpu: "1000m"
+          memory: "1Gi"
+{{- end }}

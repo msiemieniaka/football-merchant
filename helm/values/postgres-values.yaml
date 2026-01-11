@@ -1,0 +1,57 @@
+# PostgreSQL Configuration - Single Instance (Simplified for Minikube)
+postgres:
+  enabled: true
+  name: postgres
+
+  # Single primary instance (no replication for minikube)
+  primary:
+    name: postgres-primary
+    replicas: 1
+
+    image:
+      repository: postgres
+      tag: "15"
+      pullPolicy: IfNotPresent
+
+    port: 5432
+
+    service:
+      type: ClusterIP
+      port: 5432
+
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+    # Persistent storage for primary
+    storage:
+      enabled: true
+      size: 1Gi
+      storageClass: standard
+      accessMode: ReadWriteOnce
+      mountPath: /var/lib/postgresql/data
+
+    # Disable replication for now (minikube simplification)
+    replication:
+      enabled: false
+
+    # Health checks
+    livenessProbe:
+      enabled: true
+      command: ["pg_isready", "-U", "postgres"]
+      initialDelaySeconds: 30
+      periodSeconds: 10
+
+    readinessProbe:
+      enabled: true
+      command: ["pg_isready", "-U", "postgres"]
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+  # Disable replica for minikube (enable in production)
+  replica:
+    enabled: false

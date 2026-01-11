@@ -1,0 +1,17 @@
+apiVersion: v2
+name: football-ai
+description: A Helm chart for Football AI application - AI-powered football match predictions
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.23.0"
+
+maintainers:
+  - name: Marcin
+    
+keywords:
+  - football
+  - ai
+  - predictions
+  - fastapi
+  - react

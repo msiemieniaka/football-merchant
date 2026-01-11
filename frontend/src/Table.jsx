@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 
+const API_BASE = '/api'
+
 function Table() {
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    axios.get('http://localhost:8000/table')
+    axios.get(`${API_BASE}/table`)
       .then(res => {
         setTeams(res.data)
         setLoading(false)
@@ -22,7 +24,7 @@ function Table() {
         <span className="text-2xl mr-2">🏆</span>
         <h2 className="text-xl font-bold text-white">Tabela Premier League</h2>
       </div>
-      
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left">
           <thead className="text-xs text-gray-400 uppercase bg-slate-900/30">
@@ -49,7 +51,7 @@ function Table() {
                     <img src={team.logo_url} alt={team.name} className="w-8 h-8 mr-3 object-contain" />
                   ) : (
                     <div className="w-8 h-8 mr-3 bg-slate-600 rounded-full flex items-center justify-center text-xs font-bold">
-                      {team.short_name.substring(0,2)}
+                      {team.short_name.substring(0, 2)}
                     </div>
                   )}
                   <span className="font-bold text-white">{team.name}</span>
