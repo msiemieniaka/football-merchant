@@ -59,7 +59,7 @@ backend:
     enabled: false
     minReplicas: 1
     maxReplicas: 12
-    targetCPUUtilizationPercentage: 70
+    targetCPUUtilizationPercentage: 60
     # Scaling behavior policies
     behavior:
       scaleDown:
@@ -80,5 +80,60 @@ backend:
         selectPolicy: Max
 
   vpa:
-    enabled: true
+    enabled: false
     updateMode: "InPlaceOrRecreate"
+
+  # KEDA Autoscaling - Event-driven autoscaling with KEDA
+  keda:
+    enabled: false
+    minReplicaCount: 1
+    maxReplicaCount: 12
+    pollingInterval: 30 # How often to check for metrics (seconds)
+    cooldownPeriod: 300 # How long to wait after last trigger before scaling down (seconds)
+
+    triggers:
+      # CPU-based scaling
+      cpu:
+        enabled: false
+        value: "70" # Target CPU utilization percentage
+
+      # Memory-based scaling
+      memory:
+        enabled: false
+        value: "80" # Target memory utilization percentage
+
+      # Prometheus-based scaling (requires Prometheus)
+      prometheus:
+        enabled: true
+        serverAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
+        metricName: "http_requests_per_second"
+        query: '100 * sum(rate(container_cpu_usage_seconds_total{namespace="football-ai", pod=~"backend-.*", container!="POD"}[2m])) / sum(kube_pod_container_resource_requests{namespace="football-ai", pod=~"backend-.*", container!="POD", resource="cpu"})'
+        threshold: "70"
+        # query: |
+        #   sum(rate(container_cpu_usage_seconds_total{namespace="football-ai", pod=~"backend-.*", container!="POD"}[2m]))/clamp_min(count(kube_pod_info{namespace="football-ai", pod=~"backend-.*"}), 1)
+        # threshold: "0.2"
+
+    # Advanced configuration for HPA behavior (scale up/down policies)
+    advanced:
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 0
+            policies:
+              - type: Pods
+                value: 8
+                periodSeconds: 15
+              - type: Percent
+                value: 100
+                periodSeconds: 15
+            selectPolicy: Max
+          scaleDown:
+            stabilizationWindowSeconds: 300
+            policies:
+              - type: Pods
+                value: 1
+                periodSeconds: 60
+              - type: Percent
+                value: 100
+                periodSeconds: 60
+            selectPolicy: Max

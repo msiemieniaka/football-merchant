@@ -90,7 +90,7 @@ pause_between_tests() {
 # Funkcja główna
 main() {
     local start_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local total_tests=5
+    local total_tests=12
     local current_test=0
     
     log "$GREEN" "=============================================="
@@ -102,9 +102,9 @@ main() {
     
     # Lista testów do uruchomienia: (nazwa_testu, liczba_uruchomień)
     declare -a tests=(
-        "spike_test:2"
-        "ramup_test:2"
-        "soak_test:1"
+        "spike_test:4"
+        "ramup_test:4"
+        "soak_test:4"
     )
     
     for test_config in "${tests[@]}"; do

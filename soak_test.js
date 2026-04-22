@@ -3,8 +3,8 @@ import { check, sleep } from 'k6';
 
 export let options = {
   stages: [
-    { duration: '2m', target: 30 },    // szybki ramp-up do 30 VU
-    { duration: '56m', target: 30 },   // utrzymaj 56 minut
+    { duration: '2m', target: 50 },    // szybki ramp-up do 30 VU
+    { duration: '56m', target: 50 },   // utrzymaj 56 minut
     { duration: '2m', target: 0 },
   ],
   thresholds: {
@@ -14,7 +14,7 @@ export let options = {
 };
 
 // Test the backend API which actually uses CPU
-const BASE_URL = 'http://127.0.0.1/api';
+const BASE_URL = $URL;
 
 export default function () {
   // These endpoints hit the backend and use CPU

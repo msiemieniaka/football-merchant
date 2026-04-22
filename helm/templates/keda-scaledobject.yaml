@@ -1,0 +1,50 @@
+{{- /* KEDA ScaledObject for Backend */ -}}
+{{- if and .Values.backend.enabled .Values.backend.keda .Values.backend.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ .Values.backend.name | default "backend" }}-scaledobject
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  scaleTargetRef:
+    name: {{ .Values.backend.name | default "backend" }}
+  minReplicaCount: {{ .Values.backend.keda.minReplicaCount | default 1 }}
+  maxReplicaCount: {{ .Values.backend.keda.maxReplicaCount | default 10 }}
+  pollingInterval: {{ .Values.backend.keda.pollingInterval | default 30 }}
+  cooldownPeriod: {{ .Values.backend.keda.cooldownPeriod | default 300 }}
+  
+  {{- if .Values.backend.keda.advanced }}
+  advanced:
+    {{- toYaml .Values.backend.keda.advanced | nindent 4 }}
+  {{- end }}
+  
+  triggers:
+    {{- if .Values.backend.keda.triggers.cpu.enabled }}
+    # CPU-based scaling trigger
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: {{ .Values.backend.keda.triggers.cpu.value | default "70" | quote }}
+    {{- end }}
+    
+    {{- if .Values.backend.keda.triggers.memory.enabled }}
+    # Memory-based scaling trigger
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: {{ .Values.backend.keda.triggers.memory.value | default "80" | quote }}
+    {{- end }}
+    
+    {{- if .Values.backend.keda.triggers.prometheus.enabled }}
+    # Prometheus-based scaling trigger (for custom metrics)
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.backend.keda.triggers.prometheus.serverAddress | default "http://prometheus-server.monitoring.svc.cluster.local:80" }}
+        metricName: {{ .Values.backend.keda.triggers.prometheus.metricName | default "http_requests_total" }}
+        query: {{ .Values.backend.keda.triggers.prometheus.query | default "sum(rate(http_requests_total{app=\"backend\"}[2m]))" }}
+        threshold: {{ .Values.backend.keda.triggers.prometheus.threshold | default "100" | quote }}
+    {{- end }}
+{{- end }}
