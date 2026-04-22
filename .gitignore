@@ -10,7 +10,7 @@ __pycache__/
 *.so
 *.dylib
 
-.node_modules/
+node_modules/
 
 # Test binary, built with `go test -c`
 *.test

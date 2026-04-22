@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import MatchCard from '../components/MatchCard'
 
+const API_BASE = '/api'
+
 function MatchesPage() {
     const [matches, setMatches] = useState([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        axios.get('http://localhost:8000/matches')
+        axios.get(`${API_BASE}/matches`)
             .then(res => {
                 setMatches(res.data)
                 setLoading(false)

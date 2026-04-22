@@ -1,0 +1,49 @@
+# Ollama Configuration
+ollama:
+  enabled: true
+  name: ollama
+  replicas: 1
+
+  image:
+    repository: ollama/ollama
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  port: 11434
+
+  service:
+    type: ClusterIP
+    port: 11434
+
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+  # Persistent storage for models
+  storage:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+    accessMode: ReadWriteOnce
+    mountPath: /root/.ollama
+
+  env:
+    - name: OLLAMA_HOST
+      value: "0.0.0.0"
+
+  # Health checks
+  livenessProbe:
+    enabled: true
+    path: /
+    initialDelaySeconds: 60
+    periodSeconds: 30
+
+  readinessProbe:
+    enabled: true
+    path: /
+    initialDelaySeconds: 30
+    periodSeconds: 10

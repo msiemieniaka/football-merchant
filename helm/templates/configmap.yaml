@@ -1,0 +1,63 @@
+{{/*
+ConfigMaps for application configuration
+*/}}
+
+{{- /* PostgreSQL Init Config */ -}}
+{{- if and .Values.postgres .Values.postgres.enabled .Values.postgres.primary.replication.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+data:
+  init-replication.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Configuring PostgreSQL for replication..."
+    
+    # Create replication user if not exists
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+        DO \$\$
+        BEGIN
+            IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{ .Values.postgres.primary.replication.user | default "replicator" }}') THEN
+                CREATE ROLE {{ .Values.postgres.primary.replication.user | default "replicator" }} WITH REPLICATION LOGIN PASSWORD '${POSTGRES_REPLICATION_PASSWORD:-replicator_password}';
+            END IF;
+        END
+        \$\$;
+    EOSQL
+    
+    # Configure pg_hba.conf for replication
+    echo "host replication {{ .Values.postgres.primary.replication.user | default "replicator" }} 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
+    
+    # Configure postgresql.conf for replication
+    cat >> "$PGDATA/postgresql.conf" <<EOF
+    
+    # Replication settings
+    wal_level = replica
+    max_wal_senders = {{ .Values.postgres.primary.replication.maxWalSenders | default 5 }}
+    wal_keep_size = {{ .Values.postgres.primary.replication.walKeepSize | default "128MB" }}
+    max_replication_slots = 5
+    hot_standby = on
+    
+    # Performance tuning
+    shared_buffers = {{ .Values.postgres.primary.postgresConfig.shared_buffers | default "256MB" }}
+    effective_cache_size = {{ .Values.postgres.primary.postgresConfig.effective_cache_size | default "768MB" }}
+    maintenance_work_mem = {{ .Values.postgres.primary.postgresConfig.maintenance_work_mem | default "128MB" }}
+    checkpoint_completion_target = {{ .Values.postgres.primary.postgresConfig.checkpoint_completion_target | default 0.9 }}
+    wal_buffers = {{ .Values.postgres.primary.postgresConfig.wal_buffers | default "16MB" }}
+    default_statistics_target = {{ .Values.postgres.primary.postgresConfig.default_statistics_target | default 100 }}
+    random_page_cost = {{ .Values.postgres.primary.postgresConfig.random_page_cost | default 1.1 }}
+    effective_io_concurrency = {{ .Values.postgres.primary.postgresConfig.effective_io_concurrency | default 200 }}
+    work_mem = {{ .Values.postgres.primary.postgresConfig.work_mem | default "8MB" }}
+    min_wal_size = {{ .Values.postgres.primary.postgresConfig.min_wal_size | default "1GB" }}
+    max_wal_size = {{ .Values.postgres.primary.postgresConfig.max_wal_size | default "4GB" }}
+    max_connections = {{ .Values.postgres.primary.postgresConfig.max_connections | default 200 }}
+    EOF
+    
+    echo "PostgreSQL replication configuration complete!"
+---
+{{- end }}

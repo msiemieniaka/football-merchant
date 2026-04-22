@@ -1,0 +1,90 @@
+{{/*
+Persistent Volume Claims for services that need storage
+*/}}
+
+{{- /* PostgreSQL Primary PVC */ -}}
+{{- if and .Values.postgres .Values.postgres.enabled .Values.postgres.primary.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-primary-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-primary
+spec:
+  accessModes:
+    - {{ .Values.postgres.primary.storage.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.postgres.primary.storage.storageClass }}
+  storageClassName: {{ .Values.postgres.primary.storage.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.primary.storage.size }}
+---
+{{- end }}
+
+{{- /* PostgreSQL Replica PVC */ -}}
+{{- if and .Values.postgres .Values.postgres.enabled .Values.postgres.replica .Values.postgres.replica.enabled .Values.postgres.replica.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-replica-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-replica
+spec:
+  accessModes:
+    - {{ .Values.postgres.replica.storage.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.postgres.replica.storage.storageClass }}
+  storageClassName: {{ .Values.postgres.replica.storage.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.replica.storage.size }}
+---
+{{- end }}
+
+{{- /* Ollama PVC */ -}}
+{{- if and .Values.ollama.enabled .Values.ollama.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  accessModes:
+    - {{ .Values.ollama.storage.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.ollama.storage.storageClass }}
+  storageClassName: {{ .Values.ollama.storage.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.ollama.storage.size }}
+---
+{{- end }}
+
+{{- /* PgAdmin PVC */ -}}
+{{- if and .Values.pgadmin.enabled .Values.pgadmin.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgadmin-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgadmin
+spec:
+  accessModes:
+    - {{ .Values.pgadmin.storage.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.pgadmin.storage.storageClass }}
+  storageClassName: {{ .Values.pgadmin.storage.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.pgadmin.storage.size }}
+{{- end }}

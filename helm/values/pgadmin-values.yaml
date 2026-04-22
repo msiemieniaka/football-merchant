@@ -1,0 +1,45 @@
+# PgAdmin Configuration
+pgadmin:
+  enabled: false # Disabled by default, enable when needed
+  name: pgadmin
+  replicas: 1
+
+  image:
+    repository: dpage/pgadmin4
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  port: 80
+
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30050
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+  env:
+    - name: PGADMIN_DEFAULT_EMAIL
+      valueFrom:
+        secretKeyRef:
+          name: football-ai-secrets
+          key: PGADMIN_EMAIL
+    - name: PGADMIN_DEFAULT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: football-ai-secrets
+          key: PGADMIN_PASSWORD
+
+  # Persistent storage
+  storage:
+    enabled: true
+    size: 500Mi
+    storageClass: standard
+    accessMode: ReadWriteOnce
+    mountPath: /var/lib/pgadmin

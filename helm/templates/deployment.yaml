@@ -1,0 +1,542 @@
+{{/*
+Generic Deployment Template - Creates deployments for all enabled services
+*/}}
+
+{{- /* Frontend Deployment */ -}}
+{{- if .Values.frontend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.frontend.name | default "frontend" }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.frontend.name | default "frontend" }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.frontend.name | default "frontend" }}
+        {{- include "football-ai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Values.frontend.name | default "frontend" }}
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.frontend.port }}
+              protocol: TCP
+          {{- if .Values.frontend.env }}
+          env:
+            {{- toYaml .Values.frontend.env | nindent 12 }}
+          {{- end }}
+          {{- if .Values.frontend.resources }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.frontend.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontend.livenessProbe.path }}
+              port: {{ .Values.frontend.port }}
+            initialDelaySeconds: {{ .Values.frontend.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.frontend.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontend.readinessProbe.path }}
+              port: {{ .Values.frontend.port }}
+            initialDelaySeconds: {{ .Values.frontend.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.readinessProbe.periodSeconds }}
+          {{- end }}
+---
+{{- end }}
+
+{{- /* Backend Deployment */ -}}
+{{- if .Values.backend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.backend.name | default "backend" }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.backend.name | default "backend" }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.backend.name | default "backend" }}
+        {{- include "football-ai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Values.backend.name | default "backend" }}
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.backend.port }}
+              protocol: TCP
+          {{- if .Values.backend.env }}
+          env:
+            {{- toYaml .Values.backend.env | nindent 12 }}
+          {{- end }}
+          {{- if .Values.backend.envFrom }}
+          envFrom:
+            {{- toYaml .Values.backend.envFrom | nindent 12 }}
+          {{- end }}
+          {{- if .Values.backend.resources }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          {{- end }}
+---
+{{- end }}
+
+{{- /* PostgreSQL Primary Deployment */ -}}
+{{- if and .Values.postgres .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.postgres.primary.name | default "postgres-primary" }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-primary
+    role: primary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.postgres.primary.name | default "postgres-primary" }}
+      role: primary
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.postgres.primary.name | default "postgres-primary" }}
+        role: primary
+        {{- include "football-ai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.primary.image.repository }}:{{ .Values.postgres.primary.image.tag }}"
+          imagePullPolicy: {{ .Values.postgres.primary.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.postgres.primary.port | default 5432 }}
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: football-ai-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: football-ai-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: football-ai-secrets
+                  key: POSTGRES_PASSWORD
+            {{- if .Values.postgres.primary.replication.enabled }}
+            - name: POSTGRES_REPLICATION_USER
+              value: "{{ .Values.postgres.primary.replication.user | default "replicator" }}"
+            - name: POSTGRES_REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: football-ai-secrets
+                  key: POSTGRES_REPLICATION_PASSWORD
+                  optional: true
+            {{- end }}
+          {{- if .Values.postgres.primary.resources }}
+          resources:
+            {{- toYaml .Values.postgres.primary.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.postgres.primary.storage.enabled }}
+          volumeMounts:
+            - name: postgres-primary-storage
+              mountPath: {{ .Values.postgres.primary.storage.mountPath }}
+              subPath: pgdata
+            {{- if and .Values.postgres.primary.replication .Values.postgres.primary.replication.enabled }}
+            - name: postgres-config
+              mountPath: /docker-entrypoint-initdb.d/init-replication.sh
+              subPath: init-replication.sh
+            {{- end }}
+          {{- end }}
+          {{- if .Values.postgres.primary.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.postgres.primary.livenessProbe.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.postgres.primary.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.postgres.primary.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.postgres.primary.readinessProbe.enabled }}
+          readinessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.postgres.primary.readinessProbe.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.postgres.primary.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.postgres.primary.readinessProbe.periodSeconds }}
+          {{- end }}
+      volumes:
+        {{- if .Values.postgres.primary.storage.enabled }}
+        - name: postgres-primary-storage
+          persistentVolumeClaim:
+            claimName: postgres-primary-pvc
+        {{- end }}
+        {{- if and .Values.postgres.primary.replication .Values.postgres.primary.replication.enabled }}
+        - name: postgres-config
+          configMap:
+            name: postgres-init-config
+            defaultMode: 0755
+        {{- end }}
+---
+{{- end }}
+
+{{- /* PostgreSQL Replica Deployment */ -}}
+{{- if and .Values.postgres .Values.postgres.enabled .Values.postgres.replica .Values.postgres.replica.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.postgres.replica.name | default "postgres-replica" }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-replica
+    role: replica
+spec:
+  replicas: {{ .Values.postgres.replica.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.postgres.replica.name | default "postgres-replica" }}
+      role: replica
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.postgres.replica.name | default "postgres-replica" }}
+        role: replica
+        {{- include "football-ai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.replica.image.repository }}:{{ .Values.postgres.replica.image.tag }}"
+          imagePullPolicy: {{ .Values.postgres.replica.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.postgres.replica.port | default 5432 }}
+              protocol: TCP
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: football-ai-secrets
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: football-ai-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_PRIMARY_HOST
+              value: "{{ .Values.postgres.replica.primaryHost | default "postgres-primary" }}"
+            - name: POSTGRES_PRIMARY_PORT
+              value: "{{ .Values.postgres.replica.primaryPort | default 5432 }}"
+          command:
+            - bash
+            - -c
+            - |
+              # Wait for primary to be ready
+              until pg_isready -h $POSTGRES_PRIMARY_HOST -p $POSTGRES_PRIMARY_PORT -U $PGUSER; do
+                echo "Waiting for primary..."
+                sleep 2
+              done
+              
+              # Check if data directory is empty (first run)
+              if [ -z "$(ls -A /var/lib/postgresql/data 2>/dev/null)" ]; then
+                echo "Initializing replica from primary..."
+                PGPASSWORD=$PGPASSWORD pg_basebackup -h $POSTGRES_PRIMARY_HOST -p $POSTGRES_PRIMARY_PORT -U replicator -D /var/lib/postgresql/data -Fp -Xs -P -R
+              fi
+              
+              # Start postgres in standby mode
+              exec postgres
+          {{- if .Values.postgres.replica.resources }}
+          resources:
+            {{- toYaml .Values.postgres.replica.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.postgres.replica.storage.enabled }}
+          volumeMounts:
+            - name: postgres-replica-storage
+              mountPath: {{ .Values.postgres.replica.storage.mountPath }}
+              subPath: pgdata
+          {{- end }}
+          {{- if .Values.postgres.replica.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.postgres.replica.livenessProbe.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.postgres.replica.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.postgres.replica.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.postgres.replica.readinessProbe.enabled }}
+          readinessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.postgres.replica.readinessProbe.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.postgres.replica.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.postgres.replica.readinessProbe.periodSeconds }}
+          {{- end }}
+      {{- if .Values.postgres.replica.storage.enabled }}
+      volumes:
+        - name: postgres-replica-storage
+          persistentVolumeClaim:
+            claimName: postgres-replica-pvc
+      {{- end }}
+---
+{{- end }}
+
+{{- /* Ollama Deployment */ -}}
+{{- if .Values.ollama.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.ollama.name | default "ollama" }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  replicas: {{ .Values.ollama.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.ollama.name | default "ollama" }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.ollama.name | default "ollama" }}
+        {{- include "football-ai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Values.ollama.name | default "ollama" }}
+          image: "{{ .Values.ollama.image.repository }}:{{ .Values.ollama.image.tag }}"
+          imagePullPolicy: {{ .Values.ollama.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.ollama.port }}
+              protocol: TCP
+          {{- if .Values.ollama.env }}
+          env:
+            {{- toYaml .Values.ollama.env | nindent 12 }}
+          {{- end }}
+          {{- if .Values.ollama.resources }}
+          resources:
+            {{- toYaml .Values.ollama.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.ollama.storage.enabled }}
+          volumeMounts:
+            - name: ollama-storage
+              mountPath: {{ .Values.ollama.storage.mountPath }}
+          {{- end }}
+      {{- if .Values.ollama.storage.enabled }}
+      volumes:
+        - name: ollama-storage
+          persistentVolumeClaim:
+            claimName: ollama-pvc
+      {{- end }}
+---
+{{- end }}
+
+{{- /* PgAdmin Deployment */ -}}
+{{- if .Values.pgadmin.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.pgadmin.name | default "pgadmin" }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgadmin
+spec:
+  replicas: {{ .Values.pgadmin.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.pgadmin.name | default "pgadmin" }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.pgadmin.name | default "pgadmin" }}
+        {{- include "football-ai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Values.pgadmin.name | default "pgadmin" }}
+          image: "{{ .Values.pgadmin.image.repository }}:{{ .Values.pgadmin.image.tag }}"
+          imagePullPolicy: {{ .Values.pgadmin.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.pgadmin.port }}
+              protocol: TCP
+          {{- if .Values.pgadmin.env }}
+          env:
+            {{- toYaml .Values.pgadmin.env | nindent 12 }}
+          {{- end }}
+          {{- if .Values.pgadmin.resources }}
+          resources:
+            {{- toYaml .Values.pgadmin.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.pgadmin.storage.enabled }}
+          volumeMounts:
+            - name: pgadmin-storage
+              mountPath: {{ .Values.pgadmin.storage.mountPath }}
+          {{- end }}
+      {{- if .Values.pgadmin.storage.enabled }}
+      volumes:
+        - name: pgadmin-storage
+          persistentVolumeClaim:
+            claimName: pgadmin-pvc
+      {{- end }}
+---
+{{- end }}
+
+{{- /* Redis Deployment */ -}}
+{{- if and .Values.redis .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.redis.name | default "redis" }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.redis.name | default "redis" }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.redis.name | default "redis" }}
+        {{- include "football-ai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Values.redis.name | default "redis" }}
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          imagePullPolicy: {{ .Values.redis.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.redis.port | default 6379 }}
+              protocol: TCP
+          {{- if .Values.redis.config }}
+          args:
+            - "--maxmemory"
+            - "{{ .Values.redis.config.maxmemory | default "100mb" }}"
+            - "--maxmemory-policy"
+            - "{{ .Values.redis.config.maxmemoryPolicy | default "allkeys-lru" }}"
+          {{- end }}
+          {{- if .Values.redis.resources }}
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.redis.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.redis.livenessProbe.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.redis.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.redis.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.redis.readinessProbe.enabled }}
+          readinessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.redis.readinessProbe.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.redis.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.redis.readinessProbe.periodSeconds }}
+          {{- end }}
+---
+{{- end }}
+
+{{- /* PgBouncer Deployment */ -}}
+{{- if and .Values.pgbouncer .Values.pgbouncer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.pgbouncer.name | default "pgbouncer" }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "football-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgbouncer
+spec:
+  replicas: {{ .Values.pgbouncer.replicas | default 2 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.pgbouncer.name | default "pgbouncer" }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.pgbouncer.name | default "pgbouncer" }}
+        {{- include "football-ai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Values.pgbouncer.name | default "pgbouncer" }}
+          image: "{{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}"
+          imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.pgbouncer.port | default 5432 }}
+              protocol: TCP
+          env:
+            - name: DB_HOST
+              value: "{{ .Values.pgbouncer.database.host | default "postgres-primary" }}"
+            - name: DB_PORT
+              value: "{{ .Values.pgbouncer.database.port | default 5432 }}"
+            - name: DB_NAME
+              value: "{{ .Values.pgbouncer.database.name | default "football_db" }}"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: football-ai-secrets
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: football-ai-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POOL_MODE
+              value: "{{ .Values.pgbouncer.config.poolMode | default "transaction" }}"
+            - name: AUTH_TYPE
+              value: "scram-sha-256"
+            - name: MAX_CLIENT_CONN
+              value: "{{ .Values.pgbouncer.config.maxClientConn | default 200 }}"
+            - name: DEFAULT_POOL_SIZE
+              value: "{{ .Values.pgbouncer.config.defaultPoolSize | default 20 }}"
+            - name: MIN_POOL_SIZE
+              value: "{{ .Values.pgbouncer.config.minPoolSize | default 5 }}"
+            - name: RESERVE_POOL_SIZE
+              value: "{{ .Values.pgbouncer.config.reservePoolSize | default 5 }}"
+            - name: SERVER_LIFETIME
+              value: "{{ .Values.pgbouncer.config.serverLifetime | default 3600 }}"
+            - name: SERVER_IDLE_TIMEOUT
+              value: "{{ .Values.pgbouncer.config.serverIdleTimeout | default 600 }}"
+          {{- if .Values.pgbouncer.resources }}
+          resources:
+            {{- toYaml .Values.pgbouncer.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.pgbouncer.livenessProbe.enabled }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.pgbouncer.port | default 5432 }}
+            initialDelaySeconds: {{ .Values.pgbouncer.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.pgbouncer.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.pgbouncer.readinessProbe.enabled }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.pgbouncer.port | default 5432 }}
+            initialDelaySeconds: {{ .Values.pgbouncer.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.pgbouncer.readinessProbe.periodSeconds }}
+          {{- end }}
+{{- end }}

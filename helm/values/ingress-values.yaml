@@ -1,0 +1,17 @@
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: nginx
+  # host: football-ai.local  # Leave empty to access via IP
+
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+
+  # TLS configuration (optional - uncomment to enable HTTPS)
+  # tls:
+  #   - hosts:
+  #       - football-ai.local
+  #     secretName: football-ai-tls

@@ -1,0 +1,41 @@
+# Redis Configuration - Cache Layer
+redis:
+  enabled: true
+  name: redis
+
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+
+  port: 6379
+
+  service:
+    type: ClusterIP
+    port: 6379
+
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+  # Redis configuration (ephemeral cache - no persistence)
+  config:
+    maxmemory: "100mb"
+    maxmemoryPolicy: "allkeys-lru" # Evict least recently used keys
+
+  # Health checks
+  livenessProbe:
+    enabled: true
+    command: ["redis-cli", "ping"]
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+  readinessProbe:
+    enabled: true
+    command: ["redis-cli", "ping"]
+    initialDelaySeconds: 5
+    periodSeconds: 3

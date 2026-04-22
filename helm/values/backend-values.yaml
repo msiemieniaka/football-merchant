@@ -1,0 +1,139 @@
+# Backend Configuration
+backend:
+  enabled: true
+  name: backend
+  replicas: 1
+
+  image:
+    repository: ciulik/football-merchant-ai-backend
+    tag: "1.4" # New version with Redis caching support
+    pullPolicy: Always
+
+  port: 8000
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  env:
+    # Connect through PgBouncer instead of directly to PostgreSQL
+    - name: DATABASE_URL
+      value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@pgbouncer:5432/$(POSTGRES_DB)"
+    - name: OLLAMA_URL
+      value: "http://ollama:11434/api/generate"
+    # Redis cache configuration
+    - name: REDIS_URL
+      value: "redis://redis:6379/0"
+    - name: CACHE_TTL
+      value: "300" # 5 minutes in seconds
+    - name: CACHE_ENABLED
+      value: "true"
+
+  envFrom:
+    - secretRef:
+        name: football-ai-secrets
+
+  # Health checks
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+  # Autoscaling - nested under backend
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 60
+    # Scaling behavior policies
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+          - type: Pods
+            value: 4
+            periodSeconds: 15
+        selectPolicy: Max
+
+  vpa:
+    enabled: false
+    updateMode: "InPlaceOrRecreate"
+
+  # KEDA Autoscaling - Event-driven autoscaling with KEDA
+  keda:
+    enabled: false
+    minReplicaCount: 1
+    maxReplicaCount: 12
+    pollingInterval: 30 # How often to check for metrics (seconds)
+    cooldownPeriod: 300 # How long to wait after last trigger before scaling down (seconds)
+
+    triggers:
+      # CPU-based scaling
+      cpu:
+        enabled: false
+        value: "70" # Target CPU utilization percentage
+
+      # Memory-based scaling
+      memory:
+        enabled: false
+        value: "80" # Target memory utilization percentage
+
+      # Prometheus-based scaling (requires Prometheus)
+      prometheus:
+        enabled: true
+        serverAddress: "http://prometheus-server.monitoring.svc.cluster.local:80"
+        metricName: "http_requests_per_second"
+        query: '100 * sum(rate(container_cpu_usage_seconds_total{namespace="football-ai", pod=~"backend-.*", container!="POD"}[2m])) / sum(kube_pod_container_resource_requests{namespace="football-ai", pod=~"backend-.*", container!="POD", resource="cpu"})'
+        threshold: "70"
+        # query: |
+        #   sum(rate(container_cpu_usage_seconds_total{namespace="football-ai", pod=~"backend-.*", container!="POD"}[2m]))/clamp_min(count(kube_pod_info{namespace="football-ai", pod=~"backend-.*"}), 1)
+        # threshold: "0.2"
+
+    # Advanced configuration for HPA behavior (scale up/down policies)
+    advanced:
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 0
+            policies:
+              - type: Pods
+                value: 8
+                periodSeconds: 15
+              - type: Percent
+                value: 100
+                periodSeconds: 15
+            selectPolicy: Max
+          scaleDown:
+            stabilizationWindowSeconds: 300
+            policies:
+              - type: Pods
+                value: 1
+                periodSeconds: 60
+              - type: Percent
+                value: 100
+                periodSeconds: 60
+            selectPolicy: Max

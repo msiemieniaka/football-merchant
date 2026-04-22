@@ -1,0 +1,71 @@
+# PgBouncer Configuration - Connection Pooler
+pgbouncer:
+  enabled: true
+  name: pgbouncer
+
+  image:
+    repository: edoburu/pgbouncer
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  port: 5432
+
+  service:
+    type: ClusterIP
+    port: 5432
+
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "200m"
+
+  # PgBouncer settings
+  config:
+    # Pool mode: session, transaction, or statement
+    poolMode: "transaction"
+    # Maximum client connections
+    maxClientConn: 200
+    # Default pool size per user/database pair
+    defaultPoolSize: 20
+    # Minimum pool size
+    minPoolSize: 5
+    # Reserve pool size for extra connections
+    reservePoolSize: 5
+    # Reserve pool timeout
+    reservePoolTimeout: 3
+    # Server lifetime (seconds)
+    serverLifetime: 3600
+    # Server idle timeout
+    serverIdleTimeout: 600
+    # Log connections
+    logConnections: 1
+    # Log disconnections
+    logDisconnections: 1
+    # Stats period
+    statsPeriod: 60
+
+  # Database connection (points to postgres-primary service)
+  database:
+    host: postgres-primary
+    port: 5432
+    name: football_db
+    # Credentials from secret
+    userSecretKey: POSTGRES_USER
+    passwordSecretKey: POSTGRES_PASSWORD
+
+  # Health checks
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+  # Replicas for high availability
+  replicas: 2

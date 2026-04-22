@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 
+const API_BASE = '/api'
+
 function MatchAnalyticsPage() {
     const { id } = useParams()
     const navigate = useNavigate()
@@ -10,7 +12,7 @@ function MatchAnalyticsPage() {
     const [analyzing, setAnalyzing] = useState(false)
 
     useEffect(() => {
-        axios.get(`http://localhost:8000/matches/${id}`)
+        axios.get(`${API_BASE}/matches/${id}`)
             .then(res => {
                 setMatch(res.data)
                 setLoading(false)
@@ -24,7 +26,7 @@ function MatchAnalyticsPage() {
     const handleAnalyze = async () => {
         setAnalyzing(true)
         try {
-            const res = await axios.post(`http://localhost:8000/analyze/${id}`)
+            const res = await axios.post(`${API_BASE}/analyze/${id}`)
             setMatch(prev => ({
                 ...prev,
                 prediction: { ...(prev.prediction || {}), ai_text: res.data.text }
